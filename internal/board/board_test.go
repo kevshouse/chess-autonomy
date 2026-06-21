@@ -211,3 +211,143 @@ func TestBoard_VisualDiagnostic(t *testing.T) {
 	fmt.Println(b)
 	fmt.Println("-----------------------------------------")
 }
+
+func TestBoard_MakeMove_Promotion(t * testing.T) {
+	b := NewBoard()
+	// White pawn on a7 ready to step up, rest empty for clarity
+	testFEN := "8/P7/8/8/8/8/8/8 w - - 0 1"
+	if err := b.LoadFEN(testFEN); err != nil {
+		t.Fatalf("Failed to load FEN: %v", err)
+	}
+
+	a7, _ := SquareFromAlgebraic("a7")
+	a8, _ := SquareFromAlgebraic("a8")
+
+	// Create a promotion move instruction using our flag constant (Pawn to Queen).
+	m := NewMoveWithFlag(a7, a8, FlagPromoteQueen)
+
+	// Execute the promotion move
+	b.MakeMove(m)
+	
+	// 1. ASSERT: Verify old square a7 is now empty
+	_, _, occupiedA7 := b.GetPieceAt(a7)
+	if occupiedA7 {
+		t.Errorf("Expected square a7 to be empty after promotion")
+	}
+
+	// 2. ASSERT: Verify new square a8 has the promoted Queen
+	pt, colour, occupiedA8 := b.GetPieceAt(a8)
+	if !occupiedA8 {
+		t.Errorf("Expected square a8 to be occupied after promotion")
+	}
+	if pt != piece.Queen || colour != piece.White {
+		t.Errorf("Expected White Queen on a8, got type %v, colour %v", pt, colour)
+	}
+	if pt != piece.Queen {
+		t.Errorf("Expected piece type to be Queen after promotion, got %v", pt)
+	}
+	if colour != piece.White {
+		t.Errorf("Expected piece colour to be White after promotion, got %v", colour)
+	}
+}
+
+func TestBoard_EnPassantTracking(t *testing.T) {
+	b := NewBoard()
+	// Custom setup: White pawn on e5, Black pawn on d7 ready to move two squares
+	testFEN := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	if err := b.LoadFEN(testFEN); err != nil {
+		t.Fatalf("Failed to load FEN: %v", err)
+	}
+
+	e2, _ := SquareFromAlgebraic("e2")
+	e4, _ := SquareFromAlgebraic("e4")
+	e3, _ := SquareFromAlgebraic("e3")
+
+	// 1. Assert: Initially, there should be no active en passant target square
+	if b.EnPassantSquare() != NoSquare {
+		t.Errorf("Expected no active en passant square at start, got %v", b.EnPassantSquare())
+	}
+	
+	// 2. Execute a two-square pawn advance from e2 to e4
+	move := NewMoveWithFlag(e2, e4, FlagDoublePawnPush)
+	b.MakeMove(move)
+
+	// 3. Assert: The square skipped over (e3) must now be flagged as the target
+	if b.EnPassantSquare() != e3 {
+		t.Errorf("Expected en passant target square to be e3 after double pawn push, got %v", b.EnPassantSquare())
+	}
+
+	// 4. ACTION: Play a subsequent quiet move (e.g., Black playing a7 to a6)
+	a7, _ := SquareFromAlgebraic("a7")
+	a6, _ := SquareFromAlgebraic("a6")
+	m2 := NewMove(a7, a6)
+	b.MakeMove(m2)
+
+	// 5. ASSERT: The en passant privilege expires and resets to NoSquare
+	if b.EnPassantSquare() != NoSquare {
+		t.Errorf("Expected en passant target square to reset to NoSquare after a non-pawn move, got %v", b.EnPassantSquare())
+	}
+}
+
+func TestBoard_CastlingRightsTracking(t *testing.T) {
+	b := NewBoard()
+	startFen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	if err := b.LoadFEN(startFen); err != nil {
+		t.Fatalf("Failed to load FEN: %v", err)
+	}
+
+	// 1. Assert: Initially, all castling rights should be available (4 rights)
+	if b.CastlingRights() != (CastlingWK | CastlingWQ | CastlingBK | CastlingBQ) {
+		t.Errorf("Expected full castling rights, got mask: %b", b.CastlingRights())
+	}
+
+	// 2. ACTION: Move the White King from e1 to e2 (breaks both White castling rights)
+	e1, _ := SquareFromAlgebraic("e1")
+	e2, _ := SquareFromAlgebraic("e2")
+	move := NewMove(e1, e2)
+	b.MakeMove(move)
+
+	// 3. ASSERT: White's rights must be wiped out entirely, but Black's must remain untouched
+	expectedMask := CastlingBK | CastlingBQ
+	if b.CastlingRights() != expectedMask {
+		t.Errorf("Expected only Black castling rights %b, got %b", expectedMask, b.CastlingRights())
+	}
+}
+
+// Counters Test
+func TestBoard_GameCountersTracking(t *testing.T) {
+	b := NewBoard()
+	// Fen specifies 4 halfmoves (sincs last pawn/capture) and 12 full moves total.
+	testFEN := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 4 12"
+	if err := b.LoadFEN(testFEN); err != nil {
+		t.Fatalf("Failed to load FEN: %v", err)
+	}
+
+	// 1. ASSERT: Verify parsing initialization matches FEN spec
+	if b.HalfmoveClock() != 4 {
+		t.Errorf("Expected halfmove clock to be 4, got %d", b.HalfmoveClock())
+	}
+	if b.FullmoveCounter() != 12 {
+		t.Errorf("Expected fullmove counter to be 12, got %d", b.FullmoveCounter())
+	}
+
+	// 2. ACTION: Move a Knight quietly (increments halfmove, fullmove remains 12 because White is moving)
+	g1, _ := SquareFromAlgebraic("g1")
+	f3, _ := SquareFromAlgebraic("f3")
+	mQuiet := NewMove(g1, f3)
+	b.MakeMove(mQuiet)
+
+	if b.HalfmoveClock() != 5 {
+		t.Errorf("Expected halfmove clock to increment to 5 on quiet piece move, got %d", b.HalfmoveClock())
+	}
+
+	// 3. ACTION: Reset check via Pawn Push (Should wipe halfmove clock to 0)
+	e2, _ := SquareFromAlgebraic("e2")
+	e4, _ := SquareFromAlgebraic("e4")
+	mPawn := NewMoveWithFlag(e2, e4, FlagDoublePawnPush)
+	b.MakeMove(mPawn)
+
+	if b.HalfmoveClock() != 0 {
+		t.Errorf("Expected halfmove clock to reset to 0 after pawn move, got %d", b.HalfmoveClock())
+	}
+}

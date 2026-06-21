@@ -1,5 +1,7 @@
 package board
 
+import "chess-autonomy/internal/piece"
+
 // Move represents a chess move packed tightly into a single 16-bit word.
 // Bit layout:
 // Bits 0-5:   Source Square (0-63)
@@ -59,4 +61,21 @@ func (m Move) IsPromotion() bool {
 func (m Move) IsCapture() bool {
 	flag := m.Flag()
 	return flag == FlagCapture || flag == FlagEnPassant || (flag >= FlagPromoteKnightCap)
+}
+
+// Promotion maps the 4-bit move flag to the corresponding piece type for promotions.
+func (m Move) PromotionType() piece.Type {
+	flag := m.Flag()
+	switch flag {
+	case FlagPromoteKnight, FlagPromoteKnightCap:
+		return piece.Knight
+	case FlagPromoteBishop, FlagPromoteBishopCap:
+		return piece.Bishop
+	case FlagPromoteRook, FlagPromoteRookCap:
+		return piece.Rook
+	case FlagPromoteQueen, FlagPromoteQueenCap:
+		return piece.Queen
+	default:
+		return piece.None // Not a promotion move
+	}
 }

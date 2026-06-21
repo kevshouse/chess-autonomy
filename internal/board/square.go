@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+// NoSquare represents a sentinel value indicating an invalid or uninitialized square.
+const NoSquare Square = 64
+
 // Square represents a single square on the chess board.
 // Internally stored as a zero-based inde 0-63 (a1=0, h8=63).
 type Square uint8
@@ -71,3 +74,5 @@ func (s Square) ChebyshevDistance(target Square) int {
 	}
 	return deltaRank
 }
+
+
