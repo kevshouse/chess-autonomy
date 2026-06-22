@@ -21,12 +21,15 @@
 
 [x] Track Game Counters (Halfmove Clock and Fullmove Counter)
 
-[ ] Current Step: Primitive Move Generation
+[x] Primitive Move Generation
 
-	[ ] Pre-calculate Knight Jump Bitboards
+	[x] Pre-calculate Knight Jump Bitboards
 
-	[ ] Pre-calculate King Step Bitboards
+	[x] Pre-calculate King Step Bitboards
 
-	[ ] Map out Pawn attack/push arrays
+	[x] Map out Pawn attack/push arrays
 
-[ ] Design Sliding Attack Vectors (Rooks, Bishops, Queens)
+[x] Design Sliding Attack Vectors (Rooks, Bishops, Queens)
+
+Current Step:
+- Implement the Move Generation Coordinator Loop (compiling the actual pseudo-legal move lists for an active position using our pre-calculated lookup tables).
